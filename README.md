@@ -559,9 +559,9 @@ Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de 
 ## 👥 Auteurs
 
 **Smart Bin SI Team**
-- Développement : [Ton Nom]
-- Contact : [ton.email@example.com]
-- GitHub : [@ton-username](https://github.com/ton-username)
+- Développement : [FlowCreativeStudio]
+- Contact : []
+- GitHub : [@sayfox8](https://github.com/sayfox8)
 
 ---
 
@@ -576,7 +576,7 @@ Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de 
 
 ## 📞 Support
 
-- **Documentation complète** : [ARCHITECTURE.md](ARCHITECTURE) [QUICK_START.md](QUICK_START)
+- **Documentation complète** : [ARCHITECTURE](ARCHITECTURE.md) [QUICK_START](QUICK_START.md)
 - **Issues GitHub** : [Créer un ticket](https://github.com/sayfox8/SmartBin_SI/issues)
 - **Email** : 
 
