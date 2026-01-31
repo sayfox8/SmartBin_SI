@@ -79,7 +79,7 @@ void setup() {
   
   // Message de démarrage
   Serial.println("Smart Bin SI - Controleur Arduino Pret");
-  Serial.println("En attente de commandes : yellow, green, brown");
+  Serial.println("En attente de commandes : yellow, green, brown, stop, calibrate");
 }
 
 
@@ -102,6 +102,12 @@ void loop() {
     }
     else if (command == "green") {
       executeSortingSequence(ANGLE_GREEN, "GREEN", 1);  // 1 = bascule BAS
+    }
+    else if (command == "stop") {
+      emergencyStop();
+    }
+    else if (command == "calibrate") {
+      calibrationMode();
     }
     else {
       // Commande inconnue

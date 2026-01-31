@@ -44,10 +44,10 @@ SORTING_DURATION = 10    # Secondes d'attente pour le tri
 # ============================================
 # APPRENTISSAGE
 # ============================================
-LEARNING_MODE = True      # Demander validation pour chaque détection
-SAVE_IMAGES = True        # Sauvegarder les images
-MIN_DETECTIONS = 3        # Détections consécutives avant tri
-AUTO_SORT_DELAY = 2.0     # Délai entre deux tris (secondes)
+LEARNING_MODE = True        # Demander validation pour chaque détection
+SAVE_IMAGES = True          # Sauvegarder les images
+MIN_DETECTIONS = 3          # Détections consécutives avant tri
+AUTO_SORT_DELAY = 3.0       # Délai entre deux tris (secondes)
 
 # ============================================
 # BACS DE TRI
