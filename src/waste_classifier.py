@@ -30,10 +30,12 @@ _serial = None
 
 
 def init_database():
-    """Crée la base SQLite et la table si besoin."""
+    """Crée la base SQLite et toutes les tables si besoin."""
     global _conn
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     _conn = sqlite3.connect(str(DB_PATH))
+    
+    # Table 1 : Classification (objet → bac)
     _conn.execute("""
         CREATE TABLE IF NOT EXISTS waste_classification (
             item_name TEXT PRIMARY KEY,
@@ -42,6 +44,37 @@ def init_database():
             usage_count INTEGER DEFAULT 1
         )
     """)
+    
+    # Table 2 : Historique de tri (pour tracking remplissage)
+    _conn.execute("""
+        CREATE TABLE IF NOT EXISTS sorting_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            bin_color TEXT NOT NULL,
+            item_name TEXT,
+            timestamp TEXT NOT NULL,
+            confidence REAL DEFAULT 1.0
+        )
+    """)
+    
+    # Table 3 : État des bacs (remplissage, dernière vidange)
+    _conn.execute("""
+        CREATE TABLE IF NOT EXISTS bin_status (
+            bin_color TEXT PRIMARY KEY,
+            fill_level REAL DEFAULT 0.0,
+            item_count INTEGER DEFAULT 0,
+            last_emptied TEXT,
+            capacity_liters REAL DEFAULT 10.0
+        )
+    """)
+    
+    # Initialiser les bacs s'ils n'existent pas
+    from config import VALID_BINS
+    for bin_color in VALID_BINS:
+        _conn.execute("""
+            INSERT OR IGNORE INTO bin_status (bin_color, last_emptied)
+            VALUES (?, ?)
+        """, (bin_color, datetime.now().isoformat()))
+    
     _conn.commit()
 
 
@@ -156,11 +189,12 @@ def send_sort_command(bin_color):
     return True
 
 
-def classify_and_sort(item_name, ask_if_unknown=True, auto_mode=False):
+def classify_and_sort(item_name, ask_if_unknown=True, auto_mode=False, confidence=1.0):
     """
     Détermine le bac pour l'objet, enregistre si nouveau, envoie la commande de tri.
     - ask_if_unknown: si True, demande à l'utilisateur pour un objet inconnu
     - auto_mode: si True, utilise uniquement le mapping sans demander
+    - confidence: confiance de la détection (0-1)
     Retourne la couleur du bac utilisée, ou None.
     """
     if not item_name:
@@ -188,6 +222,10 @@ def classify_and_sort(item_name, ask_if_unknown=True, auto_mode=False):
                 pass
 
     if bin_color:
+        # LOG LA DÉTECTION
+        log_detection(bin_color, item_name, confidence)
+        
+        # Envoyer commande Arduino
         send_sort_command(bin_color)
         if _serial and _serial.is_open:
             import time
@@ -205,6 +243,77 @@ def get_stats():
             FROM waste_classification
             ORDER BY usage_count DESC
         """).fetchall()
+    except Exception:
+        return []
+
+
+def log_detection(bin_color, item_name, confidence=1.0):
+    """Enregistre une détection dans l'historique."""
+    if not _conn:
+        return False
+    try:
+        _conn.execute("""
+            INSERT INTO sorting_history (bin_color, item_name, timestamp, confidence)
+            VALUES (?, ?, ?, ?)
+        """, (bin_color, item_name, datetime.now().isoformat(), confidence))
+        
+        # Mise à jour du bac : +1 item
+        _conn.execute("""
+            UPDATE bin_status 
+            SET item_count = item_count + 1,
+                fill_level = fill_level + 0.5
+            WHERE bin_color = ?
+        """, (bin_color,))
+        
+        _conn.commit()
+        return True
+    except Exception as e:
+        print(f"⚠ Erreur log_detection : {e}")
+        return False
+
+
+def get_bin_status():
+    """Retourne l'état des 3 bacs (remplissage, items, dernière vidange)."""
+    if not _conn:
+        return []
+    try:
+        return _conn.execute("""
+            SELECT bin_color, fill_level, item_count, last_emptied, capacity_liters
+            FROM bin_status
+            ORDER BY bin_color ASC
+        """).fetchall()
+    except Exception as e:
+        print(f"⚠ Erreur get_bin_status : {e}")
+        return []
+
+
+def empty_bin(bin_color):
+    """Vide un bac (reset remplissage et compteur)."""
+    if not _conn:
+        return False
+    try:
+        _conn.execute("""
+            UPDATE bin_status
+            SET fill_level = 0, item_count = 0, last_emptied = ?
+            WHERE bin_color = ?
+        """, (datetime.now().isoformat(), bin_color))
+        _conn.commit()
+        return True
+    except Exception:
+        return False
+
+
+def get_detection_history(limit=50):
+    """Retourne l'historique des détections."""
+    if not _conn:
+        return []
+    try:
+        return _conn.execute("""
+            SELECT bin_color, item_name, timestamp, confidence
+            FROM sorting_history
+            ORDER BY timestamp DESC
+            LIMIT ?
+        """, (limit,)).fetchall()
     except Exception:
         return []
 

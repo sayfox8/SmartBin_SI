@@ -395,8 +395,123 @@ document.addEventListener('DOMContentLoaded', () => {
     // Lancer les mises à jour
     updateSystemInfo();
     updateGPUInfo();
+    updateBinsStatus();
+    updateDetectionsHistory();
     setInterval(updateSystemInfo, 5000);
     setInterval(updateGPUInfo, 3000);
+    setInterval(updateBinsStatus, 5000);
+    setInterval(updateDetectionsHistory, 10000);
+
+    // ============= GESTION DES BACS ============= 
+    
+    function updateBinsStatus() {
+        fetch('/api/bins/status')
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && data.bins) {
+                    data.bins.forEach(bin => {
+                        // Progress bars
+                        const progressBar = document.getElementById(`progress-${bin.color}`);
+                        if (progressBar) progressBar.style.width = bin.fill_percent + '%';
+                        
+                        const percent = document.getElementById(`percent-${bin.color}`);
+                        if (percent) percent.textContent = Math.round(bin.fill_percent) + '%';
+                        
+                        // Mise à jour des cartes de gestion
+                        const section = document.getElementById('section-bins');
+                        if (section) {
+                            const cards = section.querySelectorAll('.card');
+                            const colorNames = {
+                                'yellow': 'Bac Jaune',
+                                'green': 'Bac Vert',
+                                'brown': 'Bac Marron'
+                            };
+                            
+                            cards.forEach(card => {
+                                if (card.textContent.includes(colorNames[bin.color])) {
+                                    // Mettre à jour le contenu
+                                    const items = card.querySelectorAll('.status-item');
+                                    if (items[0]) items[0].querySelector('span:last-child').textContent = 
+                                        Math.round(bin.fill_percent) + '%';
+                                    if (items[2]) items[2].querySelector('span:last-child').textContent = 
+                                        bin.item_count;
+                                    
+                                    // Ajouter alerte si presque plein
+                                    if (bin.needs_emptying) {
+                                        card.style.backgroundColor = '#fff3cd';
+                                        const btn = card.querySelector('.btn-secondary');
+                                        if (btn) btn.style.backgroundColor = '#ff6b6b';
+                                    }
+                                }
+                            });
+                        }
+                    });
+                }
+            })
+            .catch(err => console.error('Erreur bins status:', err));
+    }
+    
+    function updateDetectionsHistory() {
+        fetch('/api/bins/history?limit=20')
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && data.history) {
+                    const tbody = document.querySelector('.detection-table tbody');
+                    if (tbody) {
+                        tbody.innerHTML = '';
+                        
+                        data.history.forEach(detection => {
+                            const row = document.createElement('tr');
+                            const timestamp = new Date(detection.timestamp);
+                            const timeStr = timestamp.toLocaleString('fr-FR');
+                            
+                            const binLabels = {
+                                'yellow': 'Jaune',
+                                'green': 'Vert',
+                                'brown': 'Marron'
+                            };
+                            
+                            row.innerHTML = `
+                                <td>${detection.item_name || 'Inconnu'}</td>
+                                <td>${binLabels[detection.bin_color] || detection.bin_color}</td>
+                                <td>${Math.round(detection.confidence * 100)}%</td>
+                                <td>${timeStr}</td>
+                            `;
+                            tbody.appendChild(row);
+                        });
+                    }
+                }
+            })
+            .catch(err => console.error('Erreur detections history:', err));
+    }
+    
+    // Boutons "Vider" pour les bacs
+    document.querySelectorAll('.section#section-bins .btn-secondary').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const card = this.closest('.card');
+            const title = card.querySelector('h3').textContent;
+            const colorMap = {
+                'Bac Jaune': 'yellow',
+                'Bac Vert': 'green',
+                'Bac Marron': 'brown'
+            };
+            const color = colorMap[title];
+            
+            if (confirm(`Êtes-vous sûr de vouloir vider le ${title} ?`)) {
+                fetch(`/api/bins/empty/${color}`, {method: 'POST'})
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            addConsoleLog('LOG', `✓ ${title} vidé avec succès`);
+                            updateBinsStatus();
+                        } else {
+                            addConsoleLog('ERROR', `✗ Erreur vidage: ${data.error}`);
+                        }
+                    })
+                    .catch(err => addConsoleLog('ERROR', `Erreur: ${err}`));
+            }
+        });
+    });
 
     console.log('Interface administrateur chargée avec succès - APIs intégrées');
 });

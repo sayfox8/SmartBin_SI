@@ -325,6 +325,6 @@ Template disponible dans INTEGRATION_GUIDE.md
 
 ---
 
-**Créé par**: GitHub Copilot
+**Créé par**: FlowGameStudio
 **Projet**: SmartBin Admin Interface
 **Itération**: TERMINÉE

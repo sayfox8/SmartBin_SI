@@ -308,6 +308,157 @@ def save_config():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
+# ============= API BACS (WASTE MANAGEMENT) ============= 
+
+@app.route('/api/bins/status')
+def bins_status():
+    """Récupère l'état des bacs (remplissage, items, dernière vidange)"""
+    try:
+        import sys
+        from pathlib import Path
+        src_dir = Path(__file__).resolve().parent.parent / 'src'
+        sys.path.insert(0, str(src_dir))
+        
+        import waste_classifier
+        waste_classifier.init_database()
+        
+        bins = waste_classifier.get_bin_status()
+        
+        # Formater les données
+        data = []
+        for bin_color, fill_level, item_count, last_emptied, capacity in bins:
+            fill_percent = min(100, (fill_level / capacity) * 100) if capacity > 0 else 0
+            data.append({
+                'color': bin_color,
+                'fill_level': float(fill_level),
+                'fill_percent': float(fill_percent),
+                'item_count': int(item_count),
+                'capacity_liters': float(capacity),
+                'last_emptied': last_emptied,
+                'needs_emptying': fill_percent > 80
+            })
+        
+        waste_classifier.cleanup()
+        
+        return jsonify({
+            'success': True,
+            'bins': data,
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/bins/history')
+def bins_history():
+    """Récupère l'historique des détections"""
+    try:
+        import sys
+        from pathlib import Path
+        src_dir = Path(__file__).resolve().parent.parent / 'src'
+        sys.path.insert(0, str(src_dir))
+        
+        limit = request.args.get('limit', 50, type=int)
+        
+        import waste_classifier
+        waste_classifier.init_database()
+        
+        history = waste_classifier.get_detection_history(limit)
+        
+        # Formater les données
+        data = []
+        for bin_color, item_name, timestamp, confidence in history:
+            data.append({
+                'bin_color': bin_color,
+                'item_name': item_name,
+                'timestamp': timestamp,
+                'confidence': float(confidence)
+            })
+        
+        waste_classifier.cleanup()
+        
+        return jsonify({
+            'success': True,
+            'history': data,
+            'count': len(data)
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/bins/empty/<bin_color>', methods=['POST'])
+def empty_bin(bin_color):
+    """Vide un bac"""
+    try:
+        import sys
+        from pathlib import Path
+        src_dir = Path(__file__).resolve().parent.parent / 'src'
+        sys.path.insert(0, str(src_dir))
+        
+        import waste_classifier
+        waste_classifier.init_database()
+        
+        result = waste_classifier.empty_bin(bin_color)
+        
+        waste_classifier.cleanup()
+        
+        if result:
+            return jsonify({
+                'success': True,
+                'message': f'Bac {bin_color} vidé avec succès',
+                'bin_color': bin_color,
+                'timestamp': datetime.now().isoformat()
+            })
+        else:
+            return jsonify({'success': False, 'error': f'Impossible de vider le bac {bin_color}'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/waste/classify', methods=['POST'])
+def waste_classify():
+    """Classifie un objet et l'ajoute au bac approprié"""
+    try:
+        import sys
+        from pathlib import Path
+        src_dir = Path(__file__).resolve().parent.parent / 'src'
+        sys.path.insert(0, str(src_dir))
+        
+        data = request.get_json()
+        item_name = data.get('item_name', '').strip()
+        confidence = data.get('confidence', 1.0)
+        auto_mode = data.get('auto_mode', False)
+        
+        if not item_name:
+            return jsonify({'success': False, 'error': 'item_name requis'})
+        
+        import waste_classifier
+        waste_classifier.init_database()
+        
+        bin_color = waste_classifier.classify_and_sort(
+            item_name, 
+            ask_if_unknown=False, 
+            auto_mode=auto_mode,
+            confidence=confidence
+        )
+        
+        waste_classifier.cleanup()
+        
+        if bin_color:
+            return jsonify({
+                'success': True,
+                'item_name': item_name,
+                'bin_color': bin_color,
+                'timestamp': datetime.now().isoformat()
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': f'Objet inconnu: {item_name}'
+            })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
 # ============= API CAMÉRA ============= 
 
 @app.route('/api/camera/status')
