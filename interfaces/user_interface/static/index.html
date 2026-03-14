@@ -310,6 +310,18 @@
                 <div class="timeout-message">Retour automatique dans <span id="timeoutCounter">10</span> secondes...</div>
             </div>
         </div>
+
+        <div id="reviewScreen" class="task-screen hidden">
+            <div class="confirmation-screen">
+                <h2>Vérification</h2>
+                <div class="confirmation-details" id="reviewDetails"></div>
+                <div class="confirmation-buttons">
+                    <button class="confirm-button confirm-good" onclick="reviewConfirm(true)">✅ Oui</button>
+                    <button class="confirm-button confirm-error" onclick="reviewConfirm(false)">❌ Non</button>
+                </div>
+                <div class="timeout-message">Confirmation automatique dans <span id="reviewTimeoutCounter">10</span> secondes...</div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -317,32 +329,47 @@
         let currentItemName = null;
         let currentImagePath = null;
         let selectedBin = null;
+        let currentReviewId = null;
+        let currentReviewItem = null;
+        let currentReviewBin = null;
         let timeoutId = null;
+        let reviewTimeoutId = null;
         let timeoutCounter = 10;
+        let reviewTimeoutCounter = 10;
 
-        // Démarrer le polling des tâches
+        // Démarrer le polling des tâches et des confirmations
         function pollTasks() {
-            fetch('/api/tasks')
-                .then(r => r.json())
-                .then(data => {
-                    if (data.success && data.pending.length > 0) {
-                        const task = data.pending[0];
-                        showTask(task);
-                    } else {
-                        showWaiting();
-                        setTimeout(pollTasks, 1000);
-                    }
-                })
-                .catch(() => {
-                    setTimeout(pollTasks, 2000);
-                });
+            Promise.all([
+                fetch('/api/tasks').then(r => r.json()),
+                fetch('/api/confirm_tasks').then(r => r.json())
+            ])
+            .then(([tasksData, confirmData]) => {
+                // Priorité aux demandes de confirmation post-tri
+                if (confirmData.success && confirmData.pending.length > 0) {
+                    showReview(confirmData.pending[0]);
+                    return;
+                }
+
+                // Sinon afficher la prochaine tâche à classer
+                if (tasksData.success && tasksData.pending.length > 0) {
+                    showTask(tasksData.pending[0]);
+                } else {
+                    showWaiting();
+                    setTimeout(pollTasks, 1000);
+                }
+            })
+            .catch(() => {
+                setTimeout(pollTasks, 2000);
+            });
         }
 
         function showWaiting() {
             clearTimeout(timeoutId);
+            clearInterval(reviewTimeoutId);
             document.getElementById('waiting').style.display = 'flex';
             document.getElementById('taskScreen').classList.add('hidden');
             document.getElementById('confirmationScreen').classList.add('hidden');
+            document.getElementById('reviewScreen').classList.add('hidden');
         }
 
         function showTask(task) {
@@ -363,6 +390,32 @@
             document.getElementById('waiting').style.display = 'none';
             document.getElementById('taskScreen').classList.remove('hidden');
             document.getElementById('confirmationScreen').classList.add('hidden');
+            document.getElementById('reviewScreen').classList.add('hidden');
+        }
+
+        function showReview(confirm) {
+            currentReviewId = confirm.confirmation_id;
+            currentReviewItem = confirm.item_name;
+            currentReviewBin = confirm.bin_color;
+
+            const details = `Objet: ${currentReviewItem.replace(/_/g, ' ')}<br>Tri proposé: ${currentReviewBin}`;
+            document.getElementById('reviewDetails').innerHTML = details;
+
+            document.getElementById('waiting').style.display = 'none';
+            document.getElementById('taskScreen').classList.add('hidden');
+            document.getElementById('confirmationScreen').classList.add('hidden');
+            document.getElementById('reviewScreen').classList.remove('hidden');
+
+            // Démarrer le timer de confirmation automatique
+            reviewTimeoutCounter = 10;
+            document.getElementById('reviewTimeoutCounter').textContent = reviewTimeoutCounter;
+            reviewTimeoutId = setInterval(() => {
+                reviewTimeoutCounter--;
+                document.getElementById('reviewTimeoutCounter').textContent = reviewTimeoutCounter;
+                if (reviewTimeoutCounter <= 0) {
+                    reviewConfirm(true); // Confirmation automatique positive
+                }
+            }, 1000);
         }
 
         function selectBin(binColor) {
@@ -396,6 +449,7 @@
 
             document.getElementById('taskScreen').classList.add('hidden');
             document.getElementById('confirmationScreen').classList.remove('hidden');
+            document.getElementById('reviewScreen').classList.add('hidden');
 
             // Démarrer le timeout
             timeoutCounter = 10;
@@ -432,6 +486,24 @@
             // Retourner à la sélection
             document.getElementById('confirmationScreen').classList.add('hidden');
             document.getElementById('taskScreen').classList.remove('hidden');
+        }
+
+        function reviewConfirm(confirmed) {
+            clearInterval(reviewTimeoutId);
+            if (!currentReviewId) return;
+
+            fetch(`/api/confirm/${currentReviewId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ confirmed })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    showWaiting();
+                    setTimeout(pollTasks, 500);
+                }
+            });
         }
 
         // Démarrer au chargement

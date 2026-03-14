@@ -18,6 +18,7 @@ from config import (
     CAMERA_SOURCE, USE_CSI_CAMERA, FRAME_WIDTH, FRAME_HEIGHT, SHOW_DISPLAY,
     AUTO_SORT_DELAY, MIN_DETECTIONS, LEARNING_MODE, SAVE_IMAGES,
     TRAINING_DIR, BIN_COLORS,
+    ENABLE_POST_SORT_CONFIRMATION, ENABLE_SORT_PAUSE, SORT_PAUSE_SECONDS,
 )
 from config import ADMIN_AUTOSTART, ADMIN_INTERFACE_PORT, USER_INTERFACE_PORT
 import socket
@@ -519,25 +520,40 @@ class WasteDetector:
                             waste_class = corrected_class
                         
                         print(f"\n🎯 OBJET DÉTECTÉ : {waste_class}")
-                        print(f"⏸️  Pause de 5 secondes avant tri...")
-                        time.sleep(5)  # 5 secondes de pause après détection
                         
-                        # Utiliser waste_classifier pour le tri
+                        # Déterminer le bac (demande via UI si inconnu), sans effectuer le tri immédiatement
                         bin_color = waste_classifier.classify_and_sort(
                             waste_class,
                             ask_if_unknown=True,
-                            auto_mode=False
+                            auto_mode=False,
+                            perform_sort=False
                         )
-                        
-                        if bin_color:
-                            print(f"✓ Tri vers le bac {bin_color}")
-                            
-                            # Demander confirmation via l'UI
+
+                        if not bin_color:
+                            continue
+
+                        # Si mode apprentissage, demander confirmation AVANT le tri
+                        if LEARNING_MODE:
+                            confirmed = waste_classifier.ask_confirmation(waste_class, bin_color)
+                            if not confirmed:
+                                print("❌ Tri annulé par l'utilisateur (mode apprentissage)")
+                                continue
+
+                        # Envoi du tri à l'Arduino / simulation
+                        waste_classifier.send_sort_command(bin_color)
+
+                        # Confirmation après tri (toujours possible depuis l'UI) - lancée immédiatement
+                        if ENABLE_POST_SORT_CONFIRMATION:
                             is_correct = waste_classifier.ask_confirmation(waste_class, bin_color)
                             if is_correct:
-                                print("✅ Tri confirmé et enregistré")
+                                print("✅ Tri confirmé")
                             else:
-                                print("❌ Tri non confirmé - information ignorée")
+                                print("❌ Tri non confirmé")
+
+                        # Pause pour laisser le temps à l'objet d'être trié physiquement
+                        if ENABLE_SORT_PAUSE and SORT_PAUSE_SECONDS > 0:
+                            print(f"⏸️  Attente {SORT_PAUSE_SECONDS} secondes pour le tri...")
+                            time.sleep(SORT_PAUSE_SECONDS)
 
                 
                 # Calculer les FPS

@@ -45,10 +45,17 @@ SORTING_DURATION = 10          # Durée d'attente pour le tri en secondes
 # ============================================
 # CONFIGURATION DE L'APPRENTISSAGE
 # ============================================
-LEARNING_MODE = False      # Mode apprentissage : validation manuelle des détections
-SAVE_IMAGES = True        # Sauvegarder les images de détection
-MIN_DETECTIONS = 3        # Nombre minimum de détections consécutives avant tri
-AUTO_SORT_DELAY = 2.0     # Délai entre deux opérations de tri en secondes
+LEARNING_MODE = False      # Mode apprentissage : validation manuelle des détections (pré-tri)
+SAVE_IMAGES = True         # Sauvegarder les images de détection
+MIN_DETECTIONS = 3         # Nombre minimum de détections consécutives avant tri
+AUTO_SORT_DELAY = 2.0      # Délai entre deux opérations de tri en secondes
+
+# ============================================
+# COMPORTEMENT APRÈS TRI
+# ============================================
+ENABLE_POST_SORT_CONFIRMATION = True  # Demander confirmation dans l'UI après avoir trié
+ENABLE_SORT_PAUSE = False              # Mettre en pause le traitement après le tri
+SORT_PAUSE_SECONDS = 5                # Durée de la pause après le tri (secondes)
 
 # ============================================
 # CONFIGURATION DES BACS DE TRI

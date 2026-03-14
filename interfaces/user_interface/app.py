@@ -74,6 +74,22 @@ def list_tasks():
     
     return jsonify({'success': True, 'pending': pending})
 
+
+@app.route('/api/confirm_tasks')
+def list_confirmations():
+    """Lister les demandes de confirmation en attente"""
+    pending = []
+    for confirm_id, conf in confirmations.items():
+        if not conf['answered']:
+            pending.append({
+                'confirmation_id': confirm_id,
+                'item_name': conf['item_name'],
+                'bin_color': conf['bin_color'],
+                'created': conf['created']
+            })
+    
+    return jsonify({'success': True, 'pending': pending})
+
 @app.route('/api/answer/<task_id>', methods=['GET', 'POST'])
 def answer(task_id):
     """

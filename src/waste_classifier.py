@@ -277,12 +277,13 @@ def send_sort_command(bin_color):
     return True
 
 
-def classify_and_sort(item_name, ask_if_unknown=True, auto_mode=False, confidence=1.0):
+def classify_and_sort(item_name, ask_if_unknown=True, auto_mode=False, confidence=1.0, perform_sort=True):
     """
-    Détermine le bac pour l'objet, enregistre si nouveau, envoie la commande de tri.
+    Détermine le bac pour l'objet, enregistre si nouveau, et optionnellement envoie la commande de tri.
     - ask_if_unknown: si True, demande à l'utilisateur pour un objet inconnu
     - auto_mode: si True, utilise uniquement le mapping sans demander
     - confidence: confiance de la détection (0-1)
+    - perform_sort: si True, envoie aussi la commande de tri à l'Arduino
     Retourne la couleur du bac utilisée, ou None.
     """
     if not item_name:
@@ -313,11 +314,12 @@ def classify_and_sort(item_name, ask_if_unknown=True, auto_mode=False, confidenc
         # LOG LA DÉTECTION
         log_detection(bin_color, item_name, confidence)
         
-        # Envoyer commande Arduino
-        send_sort_command(bin_color)
-        if _serial and _serial.is_open:
-            import time
-            time.sleep(SORTING_DURATION)
+        # Envoi optionnel du tri vers l'Arduino
+        if perform_sort:
+            send_sort_command(bin_color)
+            if _serial and _serial.is_open:
+                import time
+                time.sleep(SORTING_DURATION)
     return bin_color
 
 
